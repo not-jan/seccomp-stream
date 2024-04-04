@@ -1,0 +1,17 @@
+[package]
+name = "seccomp-stream"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+tokio = { version = "1.37.0", features = ["net"] }
+syscalls = { version = "0.6", default-features = false }
+tokio-stream = "0.1.15"
+libseccomp-sys = "0.2.1"
+
+
+[dev-dependencies]
+libseccomp = "0.3.0"
+libc = "0.2.153"
+tokio = { version = "1.37.0", features = ["macros", "rt-multi-thread",  "net"] }
