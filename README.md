@@ -1,5 +1,8 @@
 # seccomp-stream
 
+![Crates.io Version](https://img.shields.io/crates/v/seccomp-stream)
+
+
 [seccomp](https://man7.org/linux/man-pages/man2/seccomp.2.html) was amended by [seccomp_unotify](https://man7.org/linux/man-pages/man2/seccomp_unotify.2.html) in Kernel version 5.0 adding the ability to add a user space notifier for seccomp events.
 
 Support for this was added to [libseccomp-rs](https://github.com/libseccomp-rs/libseccomp-rs) already but their implementation is, while complete, blocking and as such doesn't lend itself to modern, async Rust.
