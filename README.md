@@ -4,6 +4,8 @@
 
 Support for this was added to [libseccomp-rs](https://github.com/libseccomp-rs/libseccomp-rs) already but their implementation is, while complete, blocking and as such doesn't lend itself to modern, async Rust.
 
+This crate aims to provide an async way of receiving and replying to these notifications.
+
 ## Usage
 
 After receiving a notification you may choose to let the system call pass and continue along. 
