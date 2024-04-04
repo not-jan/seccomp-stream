@@ -2,6 +2,9 @@
 name = "seccomp-stream"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/not-jan/seccomp-stream/"
+description = "tokio adapter for seccomp_unotify"
 
 [dependencies]
 
