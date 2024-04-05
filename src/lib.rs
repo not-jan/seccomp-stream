@@ -412,7 +412,7 @@ impl Stream for NotificationStream {
     /// # Returns
     ///
     /// A `Poll` indicating the state of the next notification.
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.inner.poll_read_ready(cx) {
             Poll::Ready(Ok(mut guard)) => {
                 if guard.ready().is_read_closed() {
@@ -684,7 +684,7 @@ mod tests {
 
         let fd = fd_rx.await.expect("Did not receive FD!");
 
-        let mut stream =
+        let stream =
             NotificationStream::new(fd).expect("Failed to construct NotificationStream");
 
         let notification = tokio::time::timeout(Duration::from_secs(5), stream.recv())
