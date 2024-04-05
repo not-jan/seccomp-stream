@@ -162,11 +162,11 @@ impl RawResponse {
             },
             ResponseType::RawError(err) => unsafe {
                 (*self.0).val = 0;
-                (*self.0).error = err;
+                (*self.0).error = -err;
             },
             ResponseType::Error(err) => unsafe {
                 (*self.0).val = 0;
-                (*self.0).error = err.raw_os_error().ok_or_else(|| {
+                (*self.0).error = -err.raw_os_error().ok_or_else(|| {
                     io::Error::new(
                         ErrorKind::InvalidData,
                         "Supplied io::Error did not map to an OS error!",
@@ -412,9 +412,7 @@ impl Stream for NotificationStream {
     /// # Returns
     ///
     /// A `Poll` indicating the state of the next notification.
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-
-
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.inner.poll_read_ready(cx) {
             Poll::Ready(Ok(mut guard)) => {
                 if guard.ready().is_read_closed() {
@@ -472,8 +470,7 @@ mod tests {
         Output: Send + Clone + Debug + 'static
     {
         let handle = thread::spawn(move || {
-            // Lock so we don't trash the global state of libseccomp with concurrent accesses
-            let guard = SECCOMP_MUTEX.lock().unwrap();
+
             // Just to be sure, clean the global state.
             // This doesn't actually call into kernel, just clears a global struct.
             reset_global_state().unwrap();
@@ -492,10 +489,6 @@ mod tests {
             let result = func();
 
             drop(filter);
-
-
-            // We're done with libseccomp, so we can release the mutex
-            drop(guard);
 
             result
         });
@@ -520,7 +513,127 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_drop() -> Result<(), io::Error> {
+        // This test fails only when it segfaults lol
+        RawResponse(std::ptr::null_mut());
+        RawNotification(std::ptr::null_mut());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_bad_error() -> Result<(), io::Error> {
+        // Lock so we don't trash the global state of libseccomp with concurrent accesses
+        let guard = SECCOMP_MUTEX.lock().unwrap();
+        let (fd_tx, fd_rx) = oneshot::channel::<ScmpFd>();
+
+        let handle = run_with_seccomp(fd_tx, move || {
+            let mut n = unsafe { std::mem::zeroed() };
+            let r = cvt(unsafe { libc::uname(&mut n) });
+
+            assert!(matches!(r, Ok(())));
+        });
+
+        let fd = fd_rx.await.expect("Did not receive FD!");
+
+        let mut stream =
+            NotificationStream::new(fd).expect("Failed to construct NotificationStream");
+
+        let notification = tokio::time::timeout(Duration::from_secs(5), stream.next())
+            .await
+            .expect("Did not receive a notification in time!")
+            .unwrap();
+
+        assert!(matches!(notification.syscall, Sysno::uname));
+
+        stream.send(notification, ResponseType::Error(io::Error::new(ErrorKind::Other, "Custom Error"))).expect_err("Expected error!");
+
+        unsafe { stream.send_continue(notification) }.unwrap();
+
+        handle.join().expect("Failed to wait for thread!");
+
+        drop(guard);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_error() -> Result<(), io::Error> {
+        // Lock so we don't trash the global state of libseccomp with concurrent accesses
+        let guard = SECCOMP_MUTEX.lock().unwrap();
+        let (fd_tx, fd_rx) = oneshot::channel::<ScmpFd>();
+
+        let handle = run_with_seccomp(fd_tx, move || {
+            let mut n = unsafe { std::mem::zeroed() };
+            let r = cvt(unsafe { libc::uname(&mut n) });
+
+            assert!(match r {
+                Err(e) if e.kind() == ErrorKind::Unsupported => true,
+                _ => false,
+            });
+        });
+
+        let fd = fd_rx.await.expect("Did not receive FD!");
+
+        let mut stream =
+            NotificationStream::new(fd).expect("Failed to construct NotificationStream");
+
+        let notification = tokio::time::timeout(Duration::from_secs(5), stream.next())
+            .await
+            .expect("Did not receive a notification in time!")
+            .unwrap();
+
+        assert!(matches!(notification.syscall, Sysno::uname));
+
+        stream.send(notification, ResponseType::Error(io::Error::from_raw_os_error(libc::ENOSYS))).expect("Failed to send response");
+
+        handle.join().expect("Failed to wait for thread!");
+
+        drop(guard);
+        Ok(())
+    }
+
+
+
+    #[tokio::test]
+    async fn test_raw_error() -> Result<(), io::Error> {
+        // Lock so we don't trash the global state of libseccomp with concurrent accesses
+        let guard = SECCOMP_MUTEX.lock().unwrap();
+        let (fd_tx, fd_rx) = oneshot::channel::<ScmpFd>();
+
+        let handle = run_with_seccomp(fd_tx, move || {
+            let mut n = unsafe { std::mem::zeroed() };
+            let r = cvt(unsafe { libc::uname(&mut n) });
+            assert!(match r {
+                Err(e) if e.kind() == ErrorKind::Unsupported => true,
+                _ => false,
+            });
+        });
+
+        let fd = fd_rx.await.expect("Did not receive FD!");
+
+        let mut stream =
+            NotificationStream::new(fd).expect("Failed to construct NotificationStream");
+
+        let notification = tokio::time::timeout(Duration::from_secs(5), stream.next())
+            .await
+            .expect("Did not receive a notification in time!")
+            .unwrap();
+
+        assert!(matches!(notification.syscall, Sysno::uname));
+
+        stream.send(notification, ResponseType::RawError(libc::ENOSYS)).expect("Failed to send response");
+
+        handle.join().expect("Failed to wait for thread!");
+
+        drop(guard);
+        Ok(())
+    }
+
+ 
+
+    #[tokio::test]
     async fn test_continue() -> Result<(), io::Error> {
+        // Lock so we don't trash the global state of libseccomp with concurrent accesses
+        let guard = SECCOMP_MUTEX.lock().unwrap();
         let (fd_tx, fd_rx) = oneshot::channel::<ScmpFd>();
 
         let handle = run_with_seccomp(fd_tx, move || {
@@ -549,12 +662,51 @@ mod tests {
 
         let sysname = handle.join().expect("Failed to wait for thread!");
         assert_eq!(sysname, "Linux");
-
+        drop(guard);
         Ok(())
     }
 
     #[tokio::test]
+    async fn test_continue_recv() -> Result<(), io::Error> {
+        // Lock so we don't trash the global state of libseccomp with concurrent accesses
+        let guard = SECCOMP_MUTEX.lock().unwrap();
+        let (fd_tx, fd_rx) = oneshot::channel::<ScmpFd>();
+
+        let handle = run_with_seccomp(fd_tx, move || {
+            let mut n = unsafe { std::mem::zeroed() };
+            let r = unsafe { libc::uname(&mut n) };
+            assert_eq!(r, 0);
+            unsafe { CStr::from_ptr(&n.sysname[0]) }
+                .to_str()
+                .expect("Invalid UTF-8 reply!")
+                .to_owned()
+        });
+
+        let fd = fd_rx.await.expect("Did not receive FD!");
+
+        let mut stream =
+            NotificationStream::new(fd).expect("Failed to construct NotificationStream");
+
+        let notification = tokio::time::timeout(Duration::from_secs(5), stream.recv())
+            .await
+            .expect("Did not receive a notification in time!")
+            .unwrap();
+
+        assert!(matches!(notification.syscall, Sysno::uname));
+
+        unsafe { stream.send_continue(notification) }.expect("Failed to send response");
+
+        let sysname = handle.join().expect("Failed to wait for thread!");
+        assert_eq!(sysname, "Linux");
+        drop(guard);
+        Ok(())
+    }
+
+
+    #[tokio::test]
     async fn test_intercept() -> Result<(), io::Error> {
+        // Lock so we don't trash the global state of libseccomp with concurrent accesses
+        let guard = SECCOMP_MUTEX.lock().unwrap();
         let (fd_tx, fd_rx) = oneshot::channel::<ScmpFd>();
 
         let handle = run_with_seccomp(fd_tx, move || {
@@ -591,13 +743,15 @@ mod tests {
 
         let sysname = handle.join().expect("Failed to wait for thread!");
         assert_eq!(sysname, "seccomp");
-
+        drop(guard);
         Ok(())
     }
 
 
     #[tokio::test]
     async fn test_parallel() -> Result<(), io::Error> {
+        // Lock so we don't trash the global state of libseccomp with concurrent accesses
+        let guard = SECCOMP_MUTEX.lock().unwrap();
         let (fd_tx, fd_rx) = oneshot::channel::<ScmpFd>();
 
         let handle = run_with_seccomp(fd_tx, move || {
@@ -636,10 +790,7 @@ mod tests {
 
         assert_eq!(counter.into_inner(), 40);
         handle.join().unwrap();
-        unsafe {
-            cvt(libc::close(fd)).unwrap();
-        }
-
+        drop(guard);
         Ok(())
     }
 }
