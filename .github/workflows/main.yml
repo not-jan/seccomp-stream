@@ -1,0 +1,56 @@
+name: Main
+
+on: [pull_request, push]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        run: rustup update stable
+      - name: Install libseccomp
+        run: sudo apt-get install -y libseccomp-dev libseccomp2
+      - run: |
+          cargo clippy --all-targets --all-features -- -D clippy::all
+          cargo fmt --all -- --check
+  test:
+    needs: [lint]
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        run: rustup update stable
+      - name: Install libseccomp
+        run: sudo apt-get install -y libseccomp-dev libseccomp2
+      - name: Test
+        run: |
+          docker pull ubuntu:latest
+          cargo test --all-features --all-targets
+          cargo test --doc
+  coverage:
+    needs: [test, lint]
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        run: rustup update stable
+      - name: Install libseccomp
+        run: sudo apt-get install -y libseccomp-dev libseccomp2
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Generate code coverage
+        run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4.0.1
+        with:
+          files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: not-jan/seccomp-stream
+          fail_ci_if_error: true

@@ -417,23 +417,22 @@ impl Stream for NotificationStream {
             Poll::Ready(Ok(mut guard)) => {
                 if guard.ready().is_read_closed() {
                     Poll::Ready(None)
-                } else{
+                } else {
                     let x = self.blocking_recv().ok();
                     guard.clear_ready();
                     Poll::Ready(x)
                 }
-            },
-            Poll::Ready(Err(_)) => {
-                Poll::Ready(None)
             }
-            Poll::Pending => Poll::Pending
+            Poll::Ready(Err(_)) => Poll::Ready(None),
+            Poll::Pending => Poll::Pending,
         }
-
     }
 }
 
 #[cfg(test)]
+#[allow(clippy::await_holding_lock)]
 mod tests {
+
     use super::*;
     use libseccomp::{
         reset_global_state, ScmpAction, ScmpArch, ScmpFd, ScmpFilterContext, ScmpSyscall,
@@ -443,11 +442,10 @@ mod tests {
     use std::fmt::Debug;
     use std::io::{Seek, SeekFrom, Write};
     use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::{Mutex};
+    use std::sync::Mutex;
     use std::thread;
 
     use std::time::Duration;
-
 
     use std::thread::JoinHandle;
 
@@ -467,10 +465,9 @@ mod tests {
     fn run_with_seccomp<F, Output>(fd_tx: oneshot::Sender<ScmpFd>, func: F) -> JoinHandle<Output>
     where
         F: FnOnce() -> Output + Send + 'static,
-        Output: Send + Clone + Debug + 'static
+        Output: Send + Clone + Debug + 'static,
     {
-        let handle = thread::spawn(move || {
-
+        thread::spawn(move || {
             // Just to be sure, clean the global state.
             // This doesn't actually call into kernel, just clears a global struct.
             reset_global_state().unwrap();
@@ -491,9 +488,7 @@ mod tests {
             drop(filter);
 
             result
-        });
-
-        handle
+        })
     }
 
     /// Creates and loads a seccomp() filter that will cause calls to `uname`
@@ -545,7 +540,12 @@ mod tests {
 
         assert!(matches!(notification.syscall, Sysno::uname));
 
-        stream.send(notification, ResponseType::Error(io::Error::new(ErrorKind::Other, "Custom Error"))).expect_err("Expected error!");
+        stream
+            .send(
+                notification,
+                ResponseType::Error(io::Error::new(ErrorKind::Other, "Custom Error")),
+            )
+            .expect_err("Expected error!");
 
         unsafe { stream.send_continue(notification) }.unwrap();
 
@@ -564,11 +564,7 @@ mod tests {
         let handle = run_with_seccomp(fd_tx, move || {
             let mut n = unsafe { std::mem::zeroed() };
             let r = cvt(unsafe { libc::uname(&mut n) });
-
-            assert!(match r {
-                Err(e) if e.kind() == ErrorKind::Unsupported => true,
-                _ => false,
-            });
+            assert!(matches!(r, Err(e) if e.kind() == ErrorKind::Unsupported));
         });
 
         let fd = fd_rx.await.expect("Did not receive FD!");
@@ -583,15 +579,18 @@ mod tests {
 
         assert!(matches!(notification.syscall, Sysno::uname));
 
-        stream.send(notification, ResponseType::Error(io::Error::from_raw_os_error(libc::ENOSYS))).expect("Failed to send response");
+        stream
+            .send(
+                notification,
+                ResponseType::Error(io::Error::from_raw_os_error(libc::ENOSYS)),
+            )
+            .expect("Failed to send response");
 
         handle.join().expect("Failed to wait for thread!");
 
         drop(guard);
         Ok(())
     }
-
-
 
     #[tokio::test]
     async fn test_raw_error() -> Result<(), io::Error> {
@@ -602,10 +601,7 @@ mod tests {
         let handle = run_with_seccomp(fd_tx, move || {
             let mut n = unsafe { std::mem::zeroed() };
             let r = cvt(unsafe { libc::uname(&mut n) });
-            assert!(match r {
-                Err(e) if e.kind() == ErrorKind::Unsupported => true,
-                _ => false,
-            });
+            assert!(matches!(r, Err(e) if e.kind() == ErrorKind::Unsupported));
         });
 
         let fd = fd_rx.await.expect("Did not receive FD!");
@@ -620,15 +616,15 @@ mod tests {
 
         assert!(matches!(notification.syscall, Sysno::uname));
 
-        stream.send(notification, ResponseType::RawError(libc::ENOSYS)).expect("Failed to send response");
+        stream
+            .send(notification, ResponseType::RawError(libc::ENOSYS))
+            .expect("Failed to send response");
 
         handle.join().expect("Failed to wait for thread!");
 
         drop(guard);
         Ok(())
     }
-
-
 
     #[tokio::test]
     async fn test_continue() -> Result<(), io::Error> {
@@ -684,8 +680,7 @@ mod tests {
 
         let fd = fd_rx.await.expect("Did not receive FD!");
 
-        let stream =
-            NotificationStream::new(fd).expect("Failed to construct NotificationStream");
+        let stream = NotificationStream::new(fd).expect("Failed to construct NotificationStream");
 
         let notification = tokio::time::timeout(Duration::from_secs(5), stream.recv())
             .await
@@ -701,7 +696,6 @@ mod tests {
         drop(guard);
         Ok(())
     }
-
 
     #[tokio::test]
     async fn test_intercept() -> Result<(), io::Error> {
@@ -747,7 +741,6 @@ mod tests {
         Ok(())
     }
 
-
     #[tokio::test]
     async fn test_parallel() -> Result<(), io::Error> {
         // Lock so we don't trash the global state of libseccomp with concurrent accesses
@@ -755,7 +748,6 @@ mod tests {
         let (fd_tx, fd_rx) = oneshot::channel::<ScmpFd>();
 
         let handle = run_with_seccomp(fd_tx, move || {
-
             let first = std::thread::spawn(move || {
                 for _ in 0..20 {
                     let mut n = unsafe { std::mem::zeroed() };
@@ -780,9 +772,9 @@ mod tests {
 
         let mut stream =
             NotificationStream::new(fd).expect("Failed to construct NotificationStream");
-        
+
         let counter = AtomicUsize::new(0);
-        
+
         while let Some(notification) = stream.next().await {
             counter.fetch_add(1, Ordering::Relaxed);
             unsafe { stream.send_continue(notification) }.unwrap();

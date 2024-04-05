@@ -2,6 +2,7 @@
 
 ![Crates.io Version](https://img.shields.io/crates/v/seccomp-stream?link=https%3A%2F%2Fcrates.io%2Fcrates%2Fseccomp-stream)
 ![docs.rs](https://img.shields.io/docsrs/seccomp-stream?link=https%3A%2F%2Fdocs.rs%2Fseccomp-stream%2F)
+![Codecov](https://img.shields.io/codecov/c/github/not-jan/seccomp-stream?link=https%3A%2F%2Fapp.codecov.io%2Fgh%2Fnot-jan%2Fseccomp-stream%2F)
 
 
 
