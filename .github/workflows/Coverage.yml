@@ -12,7 +12,7 @@ jobs:
       - name: Install Rust
         run: rustup update stable
       - name: Install libseccomp
-        run: apt-get install libseccomp-dev libseccomp2
+        run: sudo apt-get install -y libseccomp-dev libseccomp2
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Generate code coverage
