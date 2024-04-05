@@ -270,6 +270,9 @@ impl Notification {
 
         // If our target got killed and the pid re-used we might be non the wiser so
         // we explicitly re-check here to make sure we actually have the correct file open.
+        // TODO: Add tests for this
+        // This is untested since it'd require killing the process and
+        // we currently run all our tests within the same process
         if !self.valid() {
             return Err(io::Error::new(
                 ErrorKind::NotFound,
@@ -423,6 +426,7 @@ impl Stream for NotificationStream {
                     Poll::Ready(x)
                 }
             }
+            // I don't think this ever happens
             Poll::Ready(Err(_)) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
         }
