@@ -1,9 +1,9 @@
 # seccomp-stream
 
-![Crates.io Version](https://img.shields.io/crates/v/seccomp-stream?link=https%3A%2F%2Fcrates.io%2Fcrates%2Fseccomp-stream)
-![docs.rs](https://img.shields.io/docsrs/seccomp-stream?link=https%3A%2F%2Fdocs.rs%2Fseccomp-stream%2F)
-![Codecov](https://img.shields.io/codecov/c/github/not-jan/seccomp-stream?link=https%3A%2F%2Fapp.codecov.io%2Fgh%2Fnot-jan%2Fseccomp-stream%2F)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/not-jan/seccomp-stream/main.yml?link=https%3A%2F%2Fgithub.com%2Fnot-jan%2Fseccomp-stream%2Factions)
+[![Crates.io Version](https://img.shields.io/crates/v/seccomp-stream)](https://crates.io/crates/seccomp-stream)
+[![docs.rs](https://img.shields.io/docsrs/seccomp-stream)](https://docs.rs/seccomp-stream/)
+[![Codecov](https://img.shields.io/codecov/c/github/not-jan/seccomp-stream)](https://app.codecov.io/gh/not-jan/seccomp-stream/)
+[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/not-jan/seccomp-stream/main.yml)](https://github.com/not-jan/seccomp-stream/actions/workflows/main.yml)
 
 
 [seccomp](https://man7.org/linux/man-pages/man2/seccomp.2.html) was amended by [seccomp_unotify](https://man7.org/linux/man-pages/man2/seccomp_unotify.2.html) in Kernel version 5.0 adding the ability to add a user space notifier for seccomp events.
@@ -13,6 +13,16 @@ Support for this was added to [libseccomp-rs](https://github.com/libseccomp-rs/l
 This crate aims to provide an async way of receiving and replying to these notifications.
 
 ## Usage
+
+**TL,DR:**
+```
+cargo add seccomp-stream
+```
+or
+```
+seccomp-stream = "0.2"
+```
+ 
 
 After receiving a notification you may choose to let the system call pass and continue along. 
 This however is _unsafe_ because the arguments might've been altered in the target process by a signal.
