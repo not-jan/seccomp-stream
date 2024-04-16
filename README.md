@@ -11,10 +11,9 @@
 Support for this was added to [libseccomp-rs](https://github.com/libseccomp-rs/libseccomp-rs) already but their implementation is, while complete, blocking and as such doesn't lend itself to modern, async Rust.
 
 This crate aims to provide an async way of receiving and replying to these notifications.
+ 
+## Cargo 
 
-## Usage
-
-**TL,DR:**
 ```
 cargo add seccomp-stream
 ```
@@ -22,7 +21,9 @@ or
 ```
 seccomp-stream = "0.2"
 ```
- 
+
+
+## Usage
 
 After receiving a notification you may choose to let the system call pass and continue along. 
 This however is _unsafe_ because the arguments might've been altered in the target process by a signal.

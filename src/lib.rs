@@ -30,7 +30,7 @@ pub struct Notification {
     /// The unique identifier for the notification.
     id: u64,
     /// The process ID that made the system call.
-    pid: u32,
+    pub pid: u32,
     /// The system call number.
     pub syscall: crate::Sysno,
     /// The arguments to the system call.
